@@ -1,8 +1,8 @@
 [gd_scene load_steps=8 format=3]
 
-[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
-[ext_resource type="PackedScene" path="res://scenes/paddle.tscn" id="2_paddle"]
-[ext_resource type="PackedScene" path="res://scenes/ball.tscn" id="3_ball"]
+[ext_resource type="Script" path="res://test1/scripts/main.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://test1/scenes/paddle.tscn" id="2_paddle"]
+[ext_resource type="PackedScene" path="res://test1/scenes/ball.tscn" id="3_ball"]
 
 [sub_resource type="BoxShape3D" id="WallShapeSide"]
 size = Vector3(1, 2, 25)

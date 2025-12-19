@@ -3,7 +3,8 @@ extends Node3D
 @onready var ball = $Ball
 @onready var bricks_container = $Bricks
 
-var brick_scene_path = "res://scenes/brick.tscn"
+# Updated path to point to test1 directory
+var brick_scene_path = "res://test1/scenes/brick.tscn"
 
 func _ready():
 	spawn_bricks()
@@ -15,10 +16,9 @@ func _process(delta):
 func spawn_bricks():
 	var brick_res = load(brick_scene_path)
 	if not brick_res:
-		print("Error loading brick scene")
+		print("Error loading brick scene at: ", brick_scene_path)
 		return
 
-	# Grid settings
 	var rows = 5
 	var cols = 8
 	var start_x = -7.0

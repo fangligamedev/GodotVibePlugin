@@ -1,1 +1,8 @@
 res://main.gd
+res://addons/vibecoding_plugin/llm_communicator.gd
+res://addons/vibecoding_plugin/plugin.gd
+res://design_doc.md
+res://scripts/ball.gd
+res://scripts/brick.gd
+res://scripts/main.gd
+res://scripts/paddle.gd

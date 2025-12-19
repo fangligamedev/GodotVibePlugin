@@ -1,39 +1,32 @@
-# 3D Breakout Game - Design Document
+# 3D Breakout Game Design Document
 
 ## 1. Game Overview
-A simple 3D arcade game where the player controls a paddle to bounce a ball and destroy bricks.
+A classic breakout style game featuring 3D graphics. The player controls a paddle to bounce a ball and destroy a grid of bricks.
 
-## 2. Core Mechanics
-- **Paddle (Player):** 
-  - CharacterBody3D.
-  - Moves Left/Right (X-axis) based on input.
-- **Ball:** 
-  - RigidBody3D.
-  - Bounces off walls, paddle, and bricks physically.
-  - Needs a PhysicsMaterial with high bounce and low friction.
-- **Bricks:** 
-  - StaticBody3D (mostly).
-  - Detected by the ball/area and destroyed on impact.
-- **Game Loop:** 
-  - Ball launches -> Bricks destroyed -> Win condition (all bricks gone) or Lose condition (ball falls below paddle).
+## 2. Project Structure
+- Root: `res://` (mapped to `test1`)
+- Scenes: `res://scenes/`
+- Scripts: `res://scripts/`
 
-## 3. Project Structure
-- `res://scripts/`: Contains GDScript files.
-  - `paddle.gd`: Player movement.
-  - `ball.gd`: Ball initialization and boundary checks.
-  - `brick.gd`: Handle destruction.
-  - `game_manager.gd`: Global state (score, game over).
-- `res://scenes/`: 
-  - `main.tscn`: The level layout (Camera, Walls, Lights).
-  - `paddle.tscn`: Player prefab.
-  - `ball.tscn`: Ball prefab.
-  - `brick.tscn`: Brick prefab.
-- `res://materials/`: StandardMaterial3D resources (colors).
+## 3. Key Components
+### A. Paddle (`Paddle.tscn`)
+- Type: CharacterBody3D
+- Shape: BoxShape3D
+- Logic: Moves left/right based on input.
 
-## 4. Implementation Steps
-1. **Setup Structure:** Create directories.
-2. **Paddle:** Create scene and script.
-3. **Ball:** Create scene, physics material, and script.
-4. **Brick:** Create scene and script.
-5. **Main Level:** Setup camera, walls, lighting, and spawn bricks.
-6. **Game Loop:** Connect logic for win/lose states.
+### B. Ball (`Ball.tscn`)
+- Type: CharacterBody3D
+- Shape: SphereShape3D
+- Logic: Constant speed, bounces off walls/paddle, destroys bricks.
+
+### C. Brick (`Brick.tscn`)
+- Type: StaticBody3D
+- Shape: BoxShape3D
+- Logic: Disappears when hit.
+
+### D. Main Scene (`Main.tscn`)
+- Contains: Paddle, Ball, Walls, Brick spawner logic, Camera.
+
+## 4. Controls
+- Move: Left/Right Arrows or A/D
+- Start/Launch: Space

@@ -20,11 +20,10 @@ func _physics_process(delta):
 		if collider.has_method("hit"):
 			collider.hit()
 
-		# Prevent purely horizontal movement
+		# Prevent pure horizontal loop
 		if abs(direction.z) < 0.1:
 			direction.z = sign(direction.z) * 0.1
 			direction = direction.normalized()
 
 	if global_position.z > 5.0:
-		# Ball fell off
 		get_tree().reload_current_scene()

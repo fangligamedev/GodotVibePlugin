@@ -12,5 +12,5 @@ func _physics_process(delta):
 
 	move_and_slide()
 	
-	# Simple clamping to prevent going too far if walls fail
+	# Clamp position
 	position.x = clamp(position.x, -limit_x, limit_x)

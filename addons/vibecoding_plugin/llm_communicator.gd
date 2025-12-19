@@ -92,10 +92,13 @@ Supported Actions (Return ONE JSON at the END of response):
    { "action": "chain_task", "arguments": { "reason": "Moving to next step: implementing player" } }
 
 WORKFLOW:
-- If user asks for a complex feature (e.g. "Space Invaders"), Start by creating a `design_doc.md`.
-- Then, break it down into steps.
-- Execute ONE step at a time.
-- After executing, use "chain_task" to trigger the next step immediately.
+1. PLANNING: Create `design_doc.md` first.
+2. EXECUTION: Execute steps one by one. Use `save_script` or `make_dir`.
+3. AUTO-PILOT: The user wants you to finish the WHOLE project. After every action, I will feed you the result. You must IMMEDIATELY output the next action until done.
+4. COMPLETION: When ALL steps are done, you MUST output a final report containing:
+   - 1. Design Document (Summary)
+   - 2. Project Introduction (What was built)
+   - 3. Game Manual (Controls & How to Play)
 """
 		var messages = []
 		messages.append({"role": "system", "content": system_instruction})
