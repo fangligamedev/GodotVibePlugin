@@ -68,7 +68,7 @@ func _ready():
 	
 	input_field = TextEdit.new()
 	input_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	input_field.custom_minimum_size = Vector2(0, 80) # Increased height
+	input_field.custom_minimum_size = Vector2(0, 200) # Increased height (5x)
 	input_field.placeholder_text = "Ask AI... (Shift+Enter for newline, Cmd+V to paste image)"
 	input_field.connect("gui_input", Callable(self, "_on_input_gui_input"))
 	hbox.add_child(input_field)
