@@ -105,33 +105,29 @@ func _on_plugin_button_pressed():
 		vibecoding_dock.set_visible(!vibecoding_dock.is_visible())
 
 # State to track auto-pilot mode
-var is_auto_pilot = false
+var is_agent_mode = false # Replaces is_auto_pilot
 
 func _on_llm_suggestion_received(suggestion_text):
 	# Display LLM suggestion in Dock
 	if vibecoding_dock:
 		vibecoding_dock.display_suggestion(suggestion_text)
-	
-	# If we are in auto-pilot mode but NO action was received (this signal comes first or standalone),
-	# we generally wait to see if an action follows. 
-	# However, llm_communicator emits suggestion first, then action.
-	# So we should check if action follows. A simple way is to let the action handler drive the loop.
-	# If NO action is requested, we need to know that to STOP auto-pilot.
-	# For now, we'll let the user manually stop or the LLM explicitly conclude.
-	# A better heuristic: If response does NOT contain "action": ..., stop.
-	pass
 
 func _on_llm_action_requested(action_data):
 	print("LLM requested action:", action_data)
 	
+	# Safeguard: Actions are only allowed in Agent Mode or specific internal chains
+	if not is_agent_mode:
+		if vibecoding_dock:
+			vibecoding_dock.display_suggestion("[INFO] Action suggested but skipped (Chat Mode): " + str(action_data.get("action")))
+		return
+
 	var result = {}
 	if action_executor:
-		# Special handling for chain_task (still supported, but now implicit via Auto-Pilot)
+		# Special handling for chain_task
 		if action_data.get("action") == "chain_task":
-			is_auto_pilot = true # Explicitly enable if AI requests it
 			var reason = action_data.get("arguments", {}).get("reason", "Continuing...")
 			if vibecoding_dock:
-				vibecoding_dock.display_suggestion("[AUTO-PILOT] " + reason)
+				vibecoding_dock.display_suggestion("[AGENT] " + reason)
 		
 		# Execute the real action
 		if action_data.get("action") != "chain_task":
@@ -140,33 +136,38 @@ func _on_llm_action_requested(action_data):
 		if vibecoding_dock:
 			vibecoding_dock.display_suggestion("Action Executed: " + str(result))
 			
-		# AUTO-PILOT LOGIC
-		if is_auto_pilot:
+		# AUTO-LOOP LOGIC (Essential for Agent Mode)
+		if is_agent_mode:
 			if vibecoding_dock:
-				vibecoding_dock.display_suggestion("[AUTO-PILOT] Feedback sent. Waiting for next step...")
+				vibecoding_dock.display_suggestion("[AGENT] Feedback sent. Waiting for next step...")
 			
 			# Wait a bit to let the editor catch up / avoid spamming
-			await get_tree().create_timer(1.5).timeout
+			await get_tree().create_timer(1.0).timeout
 			
 			# Feed the result back to the LLM and ask to continue
 			var feedback = "Action executed. Result: " + str(result) + ". \nIMPORTANT: If the plan is not finished, execute the next step IMMEDIATELY. If finished, output the Final Summary."
-			_on_ui_request_analysis(feedback, true) # Pass true to indicate this is an internal auto-loop request
+			# Internal loop call, preserves current mode and passes no new images
+			_internal_agent_loop(feedback)
 
-func _on_ui_request_analysis(query, is_internal_loop=false):
+func _internal_agent_loop(feedback_query):
+	# Loop back to LLM with feedback
+	if state_manager and llm_communicator:
+		var snapshot = state_manager.get_current_state_snapshot()
+		llm_communicator.send_state_to_llm(snapshot, feedback_query, "Agent", [])
+
+func _on_ui_request_analysis(query, mode="Chat", images=[]):
 	# User manually requested analysis via UI
 	if state_manager and llm_communicator:
-		# Detect Auto-Pilot intent from user
-		if not is_internal_loop:
-			var q_lower = query.to_lower()
-			if "auto" in q_lower or "自动" in q_lower or "plan" in q_lower or "计划" in q_lower:
-				is_auto_pilot = true
-				if vibecoding_dock:
-					vibecoding_dock.display_suggestion("[AUTO-PILOT] Mode Enabled. I will execute until finished.")
-			else:
-				is_auto_pilot = false # Reset if user asks a normal question
-
+		
+		# Set Mode
+		is_agent_mode = (mode == "Agent")
+		
+		if vibecoding_dock:
+			if is_agent_mode:
+				vibecoding_dock.display_suggestion("[AGENT] Mode Enabled. I will execute tasks autonomously.")
+		
 		if query == "TEST_PING":
-			llm_communicator.send_state_to_llm({}, "Hello! This is a connectivity test.", true)
+			llm_communicator.send_state_to_llm({}, "Hello! This is a connectivity test.", "Chat", [])
 		else:
 			var snapshot = state_manager.get_current_state_snapshot()
-			llm_communicator.send_state_to_llm(snapshot, query, false)
+			llm_communicator.send_state_to_llm(snapshot, query, mode, images)

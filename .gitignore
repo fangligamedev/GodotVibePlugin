@@ -1,0 +1,6 @@
+# Godot-specific ignores
+.godot/
+*.import
+
+# Plugin specific
+addons/vibecoding_plugin/vibecoding_config.json

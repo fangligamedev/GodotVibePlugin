@@ -25,7 +25,7 @@ func _on_state_snapshot_ready(state_data):
 	pass
 
 # Public method to manually trigger analysis, e.g. from UI
-func send_state_to_llm(state_data, user_query="", is_test=false):
+func send_state_to_llm(state_data, user_query="", mode="Chat", images=[]):
 	if _pending_request:
 		print("VibeCoding: LLM Request already pending.")
 		return
@@ -61,6 +61,42 @@ func send_state_to_llm(state_data, user_query="", is_test=false):
 	var body = ""
 	var is_openrouter = api_key.begins_with("sk-or-")
 
+	# Prepare System Instruction (Chinese)
+	var system_instruction = """
+你是一个Godot引擎专家助手 (VibeCoding Agent)。
+你的目标是帮助用户设计和实现Godot 4.x游戏。
+
+当前模式: %s
+
+能力:
+1. 设计: 规划项目结构。
+2. 实现: 编写脚本，创建目录。
+3. 检查: 读取文件，列出目录以理解当前状态。
+
+支持的动作 (仅在 Agent 模式下使用，请在回复末尾返回一个 JSON):
+1. save_script
+   { "action": "save_script", "arguments": { "path": "res://script.gd", "content": "..." } }
+2. make_dir
+   { "action": "make_dir", "arguments": { "path": "res://dir" } }
+3. read_file (想要检查代码时使用!)
+   { "action": "read_file", "arguments": { "path": "res://script.gd" } }
+4. list_dir
+   { "action": "list_dir", "arguments": { "path": "res://" } }
+
+工作流 (Agent 模式):
+1. 规划: 先创建或更新 `design_doc.md`。
+2. 执行: 逐步执行。使用 `save_script` 或 `make_dir`。
+3. 自动驾驶: 用户希望你完成整个任务。每次操作后，我会把结果反馈给你。请立即输出下一个动作，直到完成。
+4. 完成: 当完成所有步骤后，必须输出一份最终报告，包含：
+   - 1. 设计文档 (摘要)
+   - 2. 项目介绍 (构建了什么)
+   - 3. 游戏说明 (操作与玩法)
+
+注意事项:
+- 如果是 Chat 模式，请直接回答用户问题，不要输出 Action JSON，除非用户明确要求生成代码片段供复制。
+- 请使用中文回复。
+""" % [mode]
+
 	if is_openrouter:
 		url = "https://openrouter.ai/api/v1/chat/completions"
 		headers = [
@@ -68,38 +104,6 @@ func send_state_to_llm(state_data, user_query="", is_test=false):
 			"Authorization: Bearer " + api_key
 		]
 		
-		# Construct prompt with System Instructions for Tools
-		var system_instruction = """
-You are a Godot Engine Expert Assistant (Agent).
-You have a specific goal: Help the user design and implement a game in Godot 4.x.
-
-CAPABILITIES:
-1. DESIGN: You can plan the project structure.
-2. IMPLEMENT: You can write scripts and create directories using tools.
-3. INSPECT: You can read files and list directories to understanding the current state.
-4. CHAIN-TASK: You can chain tasks to run autonomously.
-
-Supported Actions (Return ONE JSON at the END of response):
-1. save_script
-   { "action": "save_script", "arguments": { "path": "res://script.gd", "content": "..." } }
-2. make_dir
-   { "action": "make_dir", "arguments": { "path": "res://dir" } }
-3. read_file (Use this to check your work!)
-   { "action": "read_file", "arguments": { "path": "res://script.gd" } }
-4. list_dir
-   { "action": "list_dir", "arguments": { "path": "res://" } }
-5. chain_task (Use this to continue to the next step AUTOMATICALLY)
-   { "action": "chain_task", "arguments": { "reason": "Moving to next step: implementing player" } }
-
-WORKFLOW:
-1. PLANNING: Create `design_doc.md` first.
-2. EXECUTION: Execute steps one by one. Use `save_script` or `make_dir`.
-3. AUTO-PILOT: The user wants you to finish the WHOLE project. After every action, I will feed you the result. You must IMMEDIATELY output the next action until done.
-4. COMPLETION: When ALL steps are done, you MUST output a final report containing:
-   - 1. Design Document (Summary)
-   - 2. Project Introduction (What was built)
-   - 3. Game Manual (Controls & How to Play)
-"""
 		var messages = []
 		messages.append({"role": "system", "content": system_instruction})
 		
@@ -107,13 +111,34 @@ WORKFLOW:
 		for msg in chat_history:
 			messages.append(msg)
 			
-		# Prepare current user msg
-		var user_content = "Godot State: " + JSON.stringify(state_data) + "\n\nUser Request: " + user_query
-		var user_msg = {"role": "user", "content": user_content}
+		# Prepare current user msg (Multimodal Support)
+		var user_content_list = []
+		
+		# Text context
+		var text_context = "Godot State: " + JSON.stringify(state_data) + "\n\nUser Request: " + user_query
+		user_content_list.append({"type": "text", "text": text_context})
+		
+		# Images
+		for img in images:
+			if img and not img.is_empty():
+				var png_buffer = img.save_png_to_buffer()
+				var base64_str = Marshalls.raw_to_base64(png_buffer)
+				user_content_list.append({
+					"type": "image_url",
+					"image_url": {
+						"url": "data:image/png;base64," + base64_str
+					}
+				})
+
+		var user_msg = {"role": "user", "content": user_content_list}
 		messages.append(user_msg)
 		
-		# Save to history for next time
-		chat_history.append(user_msg)
+		# Save to history for next time (Simplified: just saving text part for now to save tokens/complexity, or full msg?)
+		# For history efficiency, maybe just save text or summary? For now, full object.
+		# CAUTION: Large images in history consume context properties.
+		# Decision: Do NOT save base64 images to history for this v0.2 to avoid context explosion.
+		var history_msg = {"role": "user", "content": text_context} 
+		chat_history.append(history_msg)
 		
 		var request_body = {
 			"model": model,
@@ -122,22 +147,49 @@ WORKFLOW:
 			
 		body = JSON.stringify(request_body)
 	else:
-		# Google Generative AI (Simplified history support for now)
-		# ... (Keep existing simple logic or upgrade if needed, focusing on OpenRouter for Agent first)
+		# Google Generative AI
 		url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + api_key
 		headers = ["Content-Type: application/json"]
 		
-		# Construct prompt with history manually for Google (as it uses 'contents' array differently)
-		var full_prompt = "System: You are a Godot Agent.\n"
+		var contents = []
+		
+		# History (Simplified for Google - it expects 'contents' array with parts)
+		var history_text = "System: " + system_instruction + "\n"
 		for msg in chat_history:
-			full_prompt += msg.role + ": " + msg.content + "\n"
-		full_prompt += "User: " + user_query + "\nState: " + JSON.stringify(state_data)
+			# msg.content might be string or array now
+			var content_str = ""
+			if typeof(msg.content) == TYPE_STRING:
+				content_str = msg.content
+			elif typeof(msg.content) == TYPE_ARRAY:
+				for part in msg.content:
+					if part.get("type") == "text":
+						content_str += part.text + "\n"
+			history_text += msg.role + ": " + content_str + "\n"
+			
+		# Current Message
+		var parts = []
+		parts.append({"text": history_text + "\nUser: " + user_query + "\nState: " + JSON.stringify(state_data)})
+		
+		# Images
+		for img in images:
+			if img and not img.is_empty():
+				var png_buffer = img.save_png_to_buffer()
+				var base64_str = Marshalls.raw_to_base64(png_buffer)
+				parts.append({
+					"inline_data": {
+						"mime_type": "image/png",
+						"data": base64_str
+					}
+				})
+		
+		contents.append({"parts": parts})
 		
 		body = JSON.stringify({
-			"contents": [{
-				"parts": [{"text": full_prompt}]
-			}]
+			"contents": contents
 		})
+		
+		# Update history (Text only)
+		chat_history.append({"role": "user", "content": user_query})
 
 	var error = http_request.request(url, headers, HTTPClient.METHOD_POST, body)
 	if error != OK:
